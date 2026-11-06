@@ -32,7 +32,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-//float convertAnalogToTemperature(uint16_t analogReadValue);
+uint16_t convertAnalogToTemperature(uint16_t temp);
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -48,10 +48,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-/*float_t temp1;
-float_t temp2;
-float_t temp3;
-float_t temp4;*/
 
 uint16_t temp1;
 uint16_t temp2;
@@ -63,6 +59,7 @@ uint16_t hum3;
 uint16_t hum4;
 
 uint32_t adc[8];
+float analogReadValue_float;
 char buffer[110];
 /* USER CODE END PV */
 
@@ -121,21 +118,16 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     
-  /*temp1 = convertAnalogToTemperature(adc[0]);
+  temp1 = convertAnalogToTemperature(adc[0]);
   temp2 = convertAnalogToTemperature(adc[1]);
   temp3 = convertAnalogToTemperature(adc[2]);
-  temp4 = convertAnalogToTemperature(adc[3]);*/
-  temp1 = adc[0];
-  temp2 = adc[1];
-  temp3 = adc[2];
-  temp4 = adc[3];
+  temp4 = convertAnalogToTemperature(adc[3]);
   hum1 = adc[4];
   hum2 = adc[5];
   hum3 = adc[6];
   hum4 = adc[7];
-      
 
-  snprintf(buffer, sizeof(buffer), "Temp1: %u, Temp2: %u, Temp3: %u, Temp4: %u, Hum1: %u, Hum2: %u, Hum3: %u, Hum4: %u\r\n", temp1, temp2, temp3, temp4, hum1, hum2, hum3, hum4);
+  snprintf(buffer, sizeof(buffer), "Temp1: %d, Temp2: %d, Temp3: %d, Temp4: %d, Hum1: %d, Hum2: %d, Hum3: %d, Hum4: %d\r\n", temp1, temp2, temp3, temp4, hum1, hum2, hum3, hum4);
   HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
   HAL_Delay(500);
   }
@@ -189,12 +181,21 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-float convertAnalogToTemperature(uint16_t analogReadValue)
+/*float convertAnalogToTemperature(uint16_t analogReadValue)
 {
   // If analogReadValue is 0, we would otherwise cause a Divide-By-Zero,
   // Treat as crazy out-of-range temperature.
-  if(analogReadValue == 0) return -1000.0;
-  return (1/((log(((10000.0 * (1023.0 - (float)analogReadValue)) / (float)analogReadValue)/10000.0)/3435.0) + (1 / (273.15 + 25.000))) - 273.15);
+  analogReadValue_float = analogReadValue / 6.6;
+  if(analogReadValue_float == 0) return -1000.0;
+  return ((1/((log(((10000.0 * (1023.0 - analogReadValue_float)) / analogReadValue_float)/10000.0)/3435.0) + (1 / (273.15 + 25.000))) - 273.15)) * 100; 
+} */
+
+uint16_t convertAnalogToTemperature(uint16_t temp)
+{
+  float Vout = temp * (3.3 / 4095); //4095  ' 12 bit resolution of the blue pill
+  float R_NTC = (Vout * 10000) /(3.3 - Vout); //calculating the resistance of the thermistor
+  float Temp_K = (298.15 * 3435)/(298.15 * log(R_NTC / 10000) + 3435); //Temperature in Kelvin
+  return ((uint16_t) ((Temp_K - 273.15) * 100)); //converting into Celsius 
 }
 /* USER CODE END 4 */
 
