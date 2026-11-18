@@ -20,6 +20,7 @@
 #include "main.h"
 #include "adc.h"
 #include "dma.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -28,11 +29,14 @@
 #include <math.h>
 #include <stdio.h>
 #include "string.h"
+#include "temp.h"
+#include "hum.h"
+#include "transmit.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-uint16_t convertAnalogToTemperature(uint16_t temp);
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -48,19 +52,22 @@ uint16_t convertAnalogToTemperature(uint16_t temp);
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+uint32_t adc[4];
+volatile uint8_t interrupcion = 0;
+uint32_t last_send = 0;
 
-uint16_t temp1;
-uint16_t temp2;
-uint16_t temp3;
-uint16_t temp4;
-uint16_t hum1;
-uint16_t hum2;
-uint16_t hum3;
-uint16_t hum4;
+humsensor_t hum[4] = {
+    { GPIOA, GPIO_PIN_4 },
+    { GPIOA, GPIO_PIN_5 },
+    { GPIOA, GPIO_PIN_6 },
+    { GPIOA, GPIO_PIN_7 }
+};
 
-uint32_t adc[8];
-float analogReadValue_float;
-char buffer[110];
+float hum_t[4] = {0};
+float hum_h[4] = {0};
+int8_t  hum_err[4] = {0}; 
+uint32_t last_hum = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,8 +113,12 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc, 8);
+  DHT11_Init();
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc, 4);
+  HAL_TIM_Base_Start(&htim2);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -117,23 +128,44 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    
-  temp1 = convertAnalogToTemperature(adc[0]);
-  temp2 = convertAnalogToTemperature(adc[1]);
-  temp3 = convertAnalogToTemperature(adc[2]);
-  temp4 = convertAnalogToTemperature(adc[3]);
-  hum1 = adc[4];
-  hum2 = adc[5];
-  hum3 = adc[6];
-  hum4 = adc[7];
+    /*
 
   snprintf(buffer, sizeof(buffer), "Temp1: %d, Temp2: %d, Temp3: %d, Temp4: %d, Hum1: %d, Hum2: %d, Hum3: %d, Hum4: %d\r\n", temp1, temp2, temp3, temp4, hum1, hum2, hum3, hum4);
   HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
   HAL_Delay(500);
+  } */
+if (HAL_GetTick() - last_send >= 1000)
+{
+    last_send = HAL_GetTick();
+
+    temp_t temperaturas = getTemp(adc);
+  
+      if (HAL_GetTick() - last_hum >= 2000) {
+        last_hum = HAL_GetTick();
+        for (uint8_t i = 0; i < 4; i++) {
+            float t, h;
+            hum_err[i] = DHT11_ReadValues(&hum[i], &t, &h);
+            if (hum_err[i] == 0) {
+                hum_t[i] = t;
+                hum_h[i] = h;
+            }
+        }
+      }
+
+    static const char *nombres[4] = { "S01", "S02", "S03", "S04"};
+
+for (uint8_t i = 0; i < 4; i++)
+{
+    int temp_x100 = (int)temperaturas.tempRead[i];   // ya viene en °C x100
+    int hum_x10   = (int)(hum_h[i] * 10.0f + 0.5f);  // % x10: 87.2 % -> 872
+
+    enviar_medicion("C01", nombres[i], temp_x100, hum_x10);
+}
   }
   /* USER CODE END 3 */
 }
 
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -181,21 +213,12 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-/*float convertAnalogToTemperature(uint16_t analogReadValue)
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-  // If analogReadValue is 0, we would otherwise cause a Divide-By-Zero,
-  // Treat as crazy out-of-range temperature.
-  analogReadValue_float = analogReadValue / 6.6;
-  if(analogReadValue_float == 0) return -1000.0;
-  return ((1/((log(((10000.0 * (1023.0 - analogReadValue_float)) / analogReadValue_float)/10000.0)/3435.0) + (1 / (273.15 + 25.000))) - 273.15)) * 100; 
-} */
-
-uint16_t convertAnalogToTemperature(uint16_t temp)
-{
-  float Vout = temp * (3.3 / 4095); //4095  ' 12 bit resolution of the blue pill
-  float R_NTC = (Vout * 10000) /(3.3 - Vout); //calculating the resistance of the thermistor
-  float Temp_K = (298.15 * 3435)/(298.15 * log(R_NTC / 10000) + 3435); //Temperature in Kelvin
-  return ((uint16_t) ((Temp_K - 273.15) * 100)); //converting into Celsius 
+  if (hadc != NULL && hadc -> Instance == ADC1)
+  {
+    interrupcion = 1;
+  }
 }
 /* USER CODE END 4 */
 
