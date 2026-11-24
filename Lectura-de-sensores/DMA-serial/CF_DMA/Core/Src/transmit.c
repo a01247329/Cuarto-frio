@@ -4,7 +4,6 @@
 #include "transmit.h"
 #include "usart.h"
 
-/* XOR de todos los caracteres del cuerpo (lo que va entre '$' y '*') */
 static uint8_t calcular_checksum(const char *cuerpo)
 {
     uint8_t cs = 0;
@@ -14,7 +13,6 @@ static uint8_t calcular_checksum(const char *cuerpo)
     return cs;
 }
 
-/* temperatura y humedad ya convertidas a enteros: 4.35 °C -> 435, 87.2 % -> 872 */
 void enviar_medicion(const char *cuarto, const char *sensor, int temp_x100, int hum_x10)
 {
     char cuerpo[48];

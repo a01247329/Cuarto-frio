@@ -128,12 +128,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /*
-
-  snprintf(buffer, sizeof(buffer), "Temp1: %d, Temp2: %d, Temp3: %d, Temp4: %d, Hum1: %d, Hum2: %d, Hum3: %d, Hum4: %d\r\n", temp1, temp2, temp3, temp4, hum1, hum2, hum3, hum4);
-  HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
-  HAL_Delay(500);
-  } */
+    
 if (HAL_GetTick() - last_send >= 1000)
 {
     last_send = HAL_GetTick();
@@ -156,8 +151,8 @@ if (HAL_GetTick() - last_send >= 1000)
 
 for (uint8_t i = 0; i < 4; i++)
 {
-    int temp_x100 = (int)temperaturas.tempRead[i];   // ya viene en °C x100
-    int hum_x10   = (int)(hum_h[i] * 10.0f + 0.5f);  // % x10: 87.2 % -> 872
+    int temp_x100 = (int)temperaturas.tempRead[i];  
+    int hum_x10   = (int)(hum_h[i] * 10.0f + 0.5f);  
 
     enviar_medicion("C01", nombres[i], temp_x100, hum_x10);
 }
